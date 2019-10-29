@@ -18,7 +18,6 @@
 #define H 5
 #define US 6
 #define UU 7
-#define UE 8 
 
 #define DATABASE "info.db"
 
@@ -29,7 +28,6 @@ typedef struct{
 }MSG;
 
 fd_set readfds;
-char buff[N] = {0};
 
 void menu(int acceptfd, MSG *msg, sqlite3 *db);
 int login_admin(int acceptfd, MSG *msg, sqlite3 *db);
@@ -118,7 +116,6 @@ int main(int argc, const char *argv[])
 	while(1)
 	{
 		tempfds = readfds;
-	//	point1:	
 		printf("waitting select:\n");
 		ret = select(maxfd + 1, &tempfds, NULL, NULL, NULL);
 		if(ret < 0)
@@ -154,7 +151,6 @@ int main(int argc, const char *argv[])
 
 void menu(int acceptfd, MSG *msg, sqlite3 *db)
 {
-	printf("-----%s-----%s-----%d-----\n", __FILE__, __func__, __LINE__);
 	int ret = 0;
 	printf("waitting recv:\n");
 	ret = recv(acceptfd, msg, sizeof(MSG), 0);
@@ -172,14 +168,12 @@ void menu(int acceptfd, MSG *msg, sqlite3 *db)
 	else
 	{
 		printf("type:%d  name:%s word:%s\n", msg->type, msg->name, msg->word);
-		printf("-----%s-----%s-----%d-----\n", __FILE__, __func__, __LINE__);
 		switch(msg->type)
 		{
 			case 10: menu_admin(acceptfd, msg, db);	break;
 			case 20: menu_user(acceptfd, msg, db);	break;
-			case 30: menu(acceptfd, msg, db);	break;
 			default:
-				 	printf("input error-----------------------------------\n");
+				 	printf("input error\n");
 		};
 	}
 }
@@ -555,10 +549,15 @@ int do_record(char *person, char *info, sqlite3 *db)
 
 int user_login_callback(void* arg,int f_num,char** f_value,char** f_name)
 {
-	printf("-----%s-----%s-----%d-----\n", __FILE__, __func__, __LINE__);
-	
-	memset(buff, sizeof(buff), 0);
-	strcpy(buff,f_value[2]);
+	int acceptfd;
+	MSG msg;
+
+	acceptfd = *((int *)arg);
+
+	msg.type = strlen(f_value[2]);
+	sprintf(msg.word, "%s", f_value[2]);
+
+	send(acceptfd, &msg, sizeof(MSG), 0);
 
 	return 0;
 }
@@ -579,39 +578,15 @@ int login_user(int acceptfd, MSG *msg, sqlite3 *db)
 {
 	char sql[128] = {0};
 	char *errmsg;
-	int ret = 0;
 	printf("this is menu_user\n");
 	printf("type:%d  name:%s word:%s\n", msg->type, msg->name, msg->word);
-	printf("-----%s-----%s-----%d-----\n", __FILE__, __func__, __LINE__);
-	
-	ret = recv(acceptfd, msg, sizeof(MSG), 0);
-	if(ret < 0)
-	{
-		perror("recv");
-		return -1;
-	}
-
 
 	memset(sql, sizeof(sql), 0);
-	sprintf(sql, "select * from staff where no = '%s'", msg->name);
-	if(sqlite3_exec(db, sql, user_login_callback, NULL, &errmsg)!= SQLITE_OK)
+	sprintf(sql, "select * from staff where name = '%s'", msg->name);
+	if(sqlite3_exec(db, sql, user_login_callback,(void *)&acceptfd, &errmsg)!= SQLITE_OK)
 	{
 		printf("%s\n", errmsg);
 		return 0;
-	}
-	printf("%s\n", buff);
-
-	if(strncmp(buff, msg->word, (strlen(msg->word) + 1)) == 0)
-	{
-		ret = send(acceptfd, "OK", 3, 0);
-		if(ret > 0)
-			printf("passed OK\n");
-	}
-	else{
-		ret = send(acceptfd, "ERROR", 4, 0);
-		if(ret > 0)
-			printf("passed ERROR\n");
-		login_user(acceptfd, msg, db);
 	}
 	//插入到历史记录表
 	char temp[64];
@@ -639,10 +614,8 @@ int choice_user(int acceptfd, MSG *msg, sqlite3 *db)
 	{
 	case US: do_user_select(acceptfd, msg, db);	break;
 	case UU: do_user_update(acceptfd, msg, db);	break;
-	case UE: printf("client exit\n");
-			 menu(acceptfd, msg, db);	break;
 	default:
-			 printf("input error******************\n");
+			 printf("input error\n");
 			 choice_user(acceptfd, msg, db);
 	};
 
@@ -668,6 +641,13 @@ int do_user_select(int acceptfd, MSG *msg, sqlite3 *db)
 	char sql[128] = {0};
 	char *errmsg;
 	int ret;
+
+	ret = recv(acceptfd, msg, sizeof(MSG), 0);
+	if(ret < 0)
+	{
+		perror("recv");
+		return -1;
+	}
 
 	memset(sql, sizeof(sql), 0);
 	sprintf(sql, "select * from staff where no = '%s'", msg->name);
@@ -707,8 +687,6 @@ int do_user_update(int acceptfd, MSG *msg, sqlite3 *db)
 		case 1:	strcpy(col, "addr");	break;
 		case 2:	strcpy(col, "phone");	break;
 		case 3:	strcpy(col, "passed");	break;
-		case 4:	printf("go to while(1)\n");
-				menu(acceptfd, msg, db);	break;
 		default:
 				printf("input error\n");
 	

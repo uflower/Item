@@ -14,7 +14,6 @@
 #define H 5
 #define US 6
 #define UU 7
-#define UE 8
 
 typedef struct{
 	int type;
@@ -65,7 +64,7 @@ int main(int argc, const char *argv[])
 	socklen_t server_len;
 	server_addr.sin_family = AF_INET;
 	server_addr.sin_port = htons(atoi(argv[1]));
-	server_addr.sin_addr.s_addr = inet_addr("192.168.30.193");
+	server_addr.sin_addr.s_addr = inet_addr("10.10.10.102");
 	server_len = sizeof(server_addr);
 
 
@@ -103,10 +102,7 @@ void menu_frist(int sockfd, MSG *msg)
 					menu_user(sockfd, msg);
 					break;
 
-		case 3:		msg->type = 30;
-					send(sockfd, msg, sizeof(MSG), 0);
-
-					exit(-1);
+		case 3:		exit(-1);			
 					break;
 
 		default:	printf("input error\n"); 
@@ -221,7 +217,7 @@ int do_select(int sockfd, MSG *msg)
 		printf("send ok\n");
 		
 		recv(sockfd, &msg1, sizeof(MSG), 0);
-		printf("工号  姓名  密码  年龄  电话  地址  工作类型  时间  等级  工资\n");
+		printf("工号 姓名 密码 年龄 电话 地址 工作类型 时间 等级 工资\n");
 		printf("%s\n", msg1.word);
 
 		choice_admin(sockfd, msg);
@@ -231,7 +227,7 @@ int do_select(int sockfd, MSG *msg)
 		strcpy(msg->word, "S2");
 		send(sockfd, msg, sizeof(MSG), 0);
 		
-		printf("工号  姓名  密码  年龄  电话  地址  工作类型  时间  等级  工资\n");
+		printf("工号 姓名 密码 年龄 电话 地址 工作类型 时间 等级 工资\n");
 		while(1)
 		{
 			recv(sockfd, msg, sizeof(MSG), 0);
@@ -460,12 +456,13 @@ void menu_user(int sockfd, MSG *msg)
 void login_user(int sockfd, MSG *msg)
 {
 	int ret;
+	char passwd[32] = {0};
 	msg->type = 20;
-	printf("请输入工号:");
+	printf("Input ur name:");
 	scanf("%s", msg->name);
 	getchar();
-	printf("请输入密码:");
-	scanf("%s", msg->word);
+	printf("Input ur passwd:");
+	scanf("%s", passwd);
 	getchar();
 	ret = send(sockfd, msg, sizeof(MSG), 0);
 	if(ret < 0){
@@ -475,11 +472,8 @@ void login_user(int sockfd, MSG *msg)
 	else{
 		printf("send ok\n");
 	}
-	
-	send(sockfd, msg, sizeof(MSG), 0);
-	
-	char buff[4] = {0};
-	ret = recv(sockfd, buff, sizeof(buff), 0);
+
+	ret = recv(sockfd, msg, sizeof(MSG), 0);
 	if(ret < 0){
 		printf("recv failed\n");
 		exit(-1);
@@ -487,12 +481,12 @@ void login_user(int sockfd, MSG *msg)
 	else{
 		printf("recv ok\n");
 	}
-	if(strncmp(buff, "OK", 3) == 0){
+	if(strncmp(msg->word, passwd, msg->type) == 0){
 		printf("LOGIN OK\n");
 	}
 	else{
-		printf("工号或密码错误\n");
-		login_user(sockfd, msg);
+		printf("user/passwd error\n");
+		exit(-1);
 	}
 }
 void choice_user(int sockfd, MSG *msg)
@@ -512,12 +506,7 @@ void choice_user(int sockfd, MSG *msg)
 					do_user_update(sockfd, msg);
 					break;
 
-		case 3:		printf("退出\n");	
-					msg->type = UE;
-					send(sockfd, msg, sizeof(MSG), 0);
-					exit(-1);
-					break;
-		default:	printf("number error\n");
+		default:	printf("input eror\n");
 					choice_user(sockfd, msg);
 	};	
 }
@@ -528,8 +517,17 @@ int do_user_select(int sockfd, MSG *msg)
 	int ret;
 	msg->type = US;
 	ret = send(sockfd, msg, sizeof(MSG), 0);
+	if(ret > 0)
+		printf("send US ok\n");
+	
+	printf("请输入工号：");
+	scanf("%s", msg->name);
+	getchar();
+	
+	ret = send(sockfd, msg, sizeof(MSG), 0);
+	if(ret > 0)
+		printf("send 工号 ok\n");
 
-	printf("工号  姓名  密码  年龄  电话  地址  工作类型  时间  等级  工资\n");
 	recv(sockfd, msg, sizeof(MSG), 0);
 	printf("%s\n", msg->word);
 
@@ -561,11 +559,12 @@ int do_user_update(int sockfd, MSG *msg)
 	scanf("%d", &(msg->type));
 	getchar();
 	if(msg->type == 4)
-	{
-		send(sockfd, msg, sizeof(MSG), 0);
-		menu_frist(sockfd, msg);
-	}
+		exit(-1);
 
+	printf("请输入工号:");
+	scanf("%s", msg->name);
+	getchar();
+	
 	printf("输入修改之后的值:");
 	scanf("%s", msg->word);
 	getchar();
@@ -573,6 +572,7 @@ int do_user_update(int sockfd, MSG *msg)
 	ret = send(sockfd, msg, sizeof(MSG), 0);
 	if(ret > 0)
 		printf("send msg ok\n");
+
 	recv(sockfd, msg, sizeof(MSG), 0);
 	if(strncmp(msg->word, "\0",1) == 0)
 		printf("修改成功\n");
